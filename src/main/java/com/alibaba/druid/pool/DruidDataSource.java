@@ -1405,6 +1405,7 @@ public class DruidDataSource extends DruidAbstractDataSource implements DruidDat
             }
 
             try {
+                // 如果等待创建连接的线程数如果大于maxWaitThreadCount，抛出异常，这个notEmptyWaitThreadCount是在pollLast(nanos)和takeLast()中设置
                 if (maxWaitThreadCount > 0
                         && notEmptyWaitThreadCount >= maxWaitThreadCount) {
                     connectErrorCountUpdater.incrementAndGet(this);
@@ -1917,12 +1918,14 @@ public class DruidDataSource extends DruidAbstractDataSource implements DruidDat
 
         for (;;) {
             if (poolingCount == 0) {
+                // 唤醒CreateThread创建连接
                 emptySignal(); // send signal to CreateThread create connection
 
                 if (failFast && failContinuous.get()) {
                     throw new DataSourceNotAvailableException(createError);
                 }
 
+                // 已经超时了
                 if (estimate <= 0) {
                     waitNanosLocal.set(nanos - estimate);
                     return null;
@@ -1933,6 +1936,7 @@ public class DruidDataSource extends DruidAbstractDataSource implements DruidDat
                     notEmptyWaitThreadPeak = notEmptyWaitThreadCount;
                 }
 
+                // 等待指定的时间
                 try {
                     long startEstimate = estimate;
                     estimate = notEmpty.awaitNanos(estimate); // signal by
@@ -1953,6 +1957,7 @@ public class DruidDataSource extends DruidAbstractDataSource implements DruidDat
                     notEmptyWaitThreadCount--;
                 }
 
+                // 说明在等待时间内连接仍然未创建完成，返回null
                 if (poolingCount == 0) {
                     if (estimate > 0) {
                         continue;
@@ -1963,6 +1968,7 @@ public class DruidDataSource extends DruidAbstractDataSource implements DruidDat
                 }
             }
 
+            // poolingCount值减1，取出poolingCount索引的DruidConnectionHolder，并置为null
             decrementPoolingCount();
             DruidConnectionHolder last = connections[poolingCount];
             connections[poolingCount] = null;
